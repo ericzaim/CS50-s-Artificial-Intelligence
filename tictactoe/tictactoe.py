@@ -1,117 +1,96 @@
-"""
-Tic Tac Toe Player
-"""
-import math
+import copy
 
 X = "X"
 O = "O"
 EMPTY = None
 
 win_indices = [
-    [(0,0),(0,1),(0,2)],[(1,0),(1,1),(1,2)],[(2,0),(2,1),(2,2)] #Rows
-    [(0,0),(1,0),(2,0)],[(0,1),(1,1),(2,1)],[(0,2),(1,2),(2,2)] #Columns
-    [(0,0),(1,1),(2,2)],[(0,2),(1,1),(2,0)] #Diagonals
-    ]
+    [(0,0),(0,1),(0,2)],[(1,0),(1,1),(1,2)],[(2,0),(2,1),(2,2)], # Rows
+    [(0,0),(1,0),(2,0)],[(0,1),(1,1),(2,1)],[(0,2),(1,2),(2,2)], # Columns
+    [(0,0),(1,1),(2,2)],[(0,2),(1,1),(2,0)] # Diagonals
+]
 
 def initial_state():
-    """
-    Returns starting state of the board.
-    """
     return [[EMPTY, EMPTY, EMPTY],
             [EMPTY, EMPTY, EMPTY],
             [EMPTY, EMPTY, EMPTY]]
 
-
 def player(board):
-    """
-    Returns player who has the next turn on a board.
-    """
-    for line in board:
-        count_x = line.count(X)
-        count_o = line.count(O)
-        count_empty = line.count(EMPTY)
-        if count_x > count_o and count_empty!=0:
-            return O
-        return X
-
-    raise NotImplementedError
-
+    count_x = sum(row.count(X) for row in board)
+    count_o = sum(row.count(O) for row in board)
+    return O if count_x > count_o else X
 
 def actions(board):
-    """
-    Returns set of all possible actions (i, j) available on the board.
-    """
-    actions = set()
-    for i, row in enumerate(board):
-        for j, square in enumerate(row):
-            if square == EMPTY:
-                actions.add((i, j))
-    return actions
-
+    return {(i, j) for i in range(3) for j in range(3) if board[i][j] == EMPTY}
 
 def result(board, action):
-    """
-    Returns the board that results from making move (i, j) on the board.
-    """
-    for i,row in enumerate(board):
-        for j in range(len(row)):
-            if (i,j) == action:
-                board[i,j] = player(board) 
-                return board
-
-    raise NotImplementedError
-
+    i, j = action
+    if board[i][j] is not EMPTY:
+        raise ValueError("Invalid move")
+    new_board = copy.deepcopy(board)
+    new_board[i][j] = player(board)
+    return new_board
 
 def winner(board):
-    """
-    Returns the winner of the game, if there is one.
-    """
-    maps={}
-    for i,row in board:
-        for j,cell in row:
-            maps[cell].append((i,j))
-            
-    for combination in win_indices:
-        if (combo == combination for combo in maps[combination[0]]):
-            return combination[0]
-        return None
-
-    raise NotImplementedError
-
+    for combo in win_indices:
+        a, b, c = combo
+        if board[a[0]][a[1]] == board[b[0]][b[1]] == board[c[0]][c[1]] != EMPTY:
+            return board[a[0]][a[1]]
+    return None
 
 def terminal(board):
-    """
-    Returns True if game is over, False otherwise.
-    """
-    for row in board:
-        if (square == EMPTY for square in row):
-            return True
-        return False
-    raise NotImplementedError
-
+    return winner(board) is not None or all(square is not EMPTY for row in board for square in row)
 
 def utility(board):
-    """
-    Returns 1 if X has won the game, -1 if O has won, 0 otherwise.
-    """
-    if terminal(board) == True:
-        if winner(board) == X:
-            return 1
-        elif winner(board) == O:
-            return -1
-        return 0
-    raise NotImplementedError
-
+    w = winner(board)
+    if w == X: return 1
+    if w == O: return -1
+    return 0
 
 def minimax(board):
     """
     Returns the optimal action for the current player on the board.
+    Uses alpha-beta pruning.
     """
-    while True:
-        while terminal(board) != True:
-            for action in actions(board):
-                new_board = result(board,action)
-                if utility(new_board) == 1:
-                    return action
-                
-    raise NotImplementedError
+    if terminal(board):
+        return None
+
+    turn = player(board)
+
+    if turn == X:
+        best_val, best_move = float('-inf'), None
+        for action in actions(board):
+            val = min_value(result(board, action), float('-inf'), float('inf'))
+            if val > best_val:
+                best_val, best_move = val, action
+        return best_move
+
+    else:  # turn == O
+        best_val, best_move = float('inf'), None
+        for action in actions(board):
+            val = max_value(result(board, action), float('-inf'), float('inf'))
+            if val < best_val:
+                best_val, best_move = val, action
+        return best_move
+
+def max_value(state, alpha, beta):
+    if terminal(state):
+        return utility(state)
+    v = float('-inf')
+    for action in actions(state):
+        v = max(v, min_value(result(state, action), alpha, beta))
+        if v >= beta:
+            return v  # prune
+        alpha = max(alpha, v)
+    return v
+
+def min_value(state, alpha, beta):
+    if terminal(state):
+        return utility(state)
+    v = float('inf')
+    for action in actions(state):
+        v = min(v, max_value(result(state, action), alpha, beta))
+        if v <= alpha:
+            return v  # prune
+        beta = min(beta, v)
+    return v
